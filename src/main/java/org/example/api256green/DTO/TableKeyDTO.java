@@ -1,4 +1,4 @@
-package org.example.api256green;
+package org.example.api256green.DTO;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.GeneratedValue;

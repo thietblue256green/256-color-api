@@ -1,4 +1,4 @@
-package org.example.api256green;
+package org.example.api256green.entites;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;

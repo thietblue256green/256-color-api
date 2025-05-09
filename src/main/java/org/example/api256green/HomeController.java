@@ -1,9 +1,22 @@
 package org.example.api256green;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import org.example.api256green.DTO.IpAddRestDTO;
+import org.example.api256green.Repositores.IpDeviceRepository;
+import org.example.api256green.Repositores.TableKeyRepository;
+import org.example.api256green.DTO.TableKeyDTO;
+import org.example.api256green.entites.IpDevice;
+import org.example.api256green.entites.TableKey;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
@@ -12,12 +25,23 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Objects;
+import org.example.api256green.Repositores.IPLoginRepository;
+import org.example.api256green.Repositores.Ip256ColorGreenRepository;
+import org.example.api256green.entites.IPLogin;
+import org.example.api256green.entites.Ip256ColorGreen;
 
 @RestController
 @RequestMapping("/256-green-color-api")
 public class HomeController {
     @Autowired
     TableKeyRepository tableKeyRepository;
+    @Autowired
+    Ip256ColorGreenRepository ip256ColorGreenRepository;
+    @Autowired
+    IPLoginRepository iPLoginRepository;
+    @Autowired
+    IpDeviceRepository ipDeviceRepository;
+    
     @GetMapping("/get-key")
     public List<Object[]> getAll() {
         return tableKeyRepository.getAllKey();
@@ -95,4 +119,105 @@ public class HomeController {
         }
     }
 
+    @GetMapping("/get-ip-success")
+    public List<Ip256ColorGreen> getListIPSuccess() {
+        return ip256ColorGreenRepository.findAll();
+    }
+    
+    @GetMapping("/get-all-ip-login")
+    public List<IPLogin> getAllIpLogin() {
+        return iPLoginRepository.findAll();
+    }
+    @GetMapping("/get-all-ip-device")
+    public List<IpDevice> getAllIpDevice() {
+        return ipDeviceRepository.findAll();
+    }
+    @GetMapping("/add-ip-login")
+    public IPLogin getAddIpLogin() {
+        IpAddRestDTO ipAddRestDTO = getIpAddRest();
+        System.out.println(ipAddRestDTO.toString());
+
+//        for (IPLogin ipLogin: iPLoginRepository.findAll()) {
+//            if(!(ipLogin.getIpLogin().trim().equals(ipAddRestDTO.getIp().trim())) || iPLoginRepository.findAll() == null || iPLoginRepository.findAll().isEmpty()) {
+//                IPLogin ipLoginSave = new IPLogin();
+//                ipLoginSave.setIpLogin(ipAddRestDTO.getIp());
+//                ipLoginSave.setCreatedate(new Date());
+//                ipLoginSave.setStatus(1);
+//                this.iPLoginRepository.save(ipLoginSave);
+//            }
+//        }
+        if(iPLoginRepository.getIPLGByIp(ipAddRestDTO.getIp()) == null || iPLoginRepository.getIPLGByIp(ipAddRestDTO.getIp()).getId() == null) {
+            IPLogin ipLoginSave = new IPLogin();
+            ipLoginSave.setIpLogin(ipAddRestDTO.getIp());
+            ipLoginSave.setCreatedate(new Date());
+            ipLoginSave.setStatus(1);
+            this.iPLoginRepository.save(ipLoginSave);
+        }
+
+        if(ipDeviceRepository.getIPDByIp(ipAddRestDTO.getIdDevice()) == null || ipDeviceRepository.getIPDByIp(ipAddRestDTO.getIdDevice()).getId() == null) {
+            IpDevice ipDeviceSave = new IpDevice();
+            ipDeviceSave.setIpDevice(ipAddRestDTO.getIdDevice());
+            ipDeviceSave.setCreatedate(new Date());
+            ipDeviceSave.setStatus(1);
+            this.ipDeviceRepository.save(ipDeviceSave);
+        }
+
+//        for (IpDevice ipDevice: ipDeviceRepository.findAll()) {
+//            if(!(ipDevice.getIpDevice().trim().equals(ipAddRestDTO.getIdDevice().trim())) || ipDeviceRepository.findAll() == null || ipDeviceRepository.findAll().isEmpty()) {
+//                IpDevice ipDeviceSave = new IpDevice();
+//                ipDeviceSave.setIpDevice(ipAddRestDTO.getIdDevice());
+//                ipDeviceSave.setCreatedate(new Date());
+//                ipDeviceSave.setStatus(1);
+//                this.ipDeviceRepository.save(ipDeviceSave);
+//            }
+//        }
+
+        return null;
+    }
+
+    public IpAddRestDTO getIpAddRest() {
+        try {
+            // Tạo HttpClient để gửi yêu cầu
+            HttpClient client = HttpClient.newHttpClient();
+
+            // URL của dịch vụ geolocation API (ip-api)
+            String url = "http://ip-api.com/json/";
+
+            // Gửi yêu cầu GET tới API
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .build();
+
+            // Nhận phản hồi từ API
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            // Nếu yêu cầu thành công (status code 200)
+            if (response.statusCode() == 200) {
+                // Phân tích dữ liệu JSON trả về
+                String responseBody = response.body();
+                JsonObject jsonObject = JsonParser.parseString(responseBody).getAsJsonObject();
+
+                // Lấy thông tin vị trí từ API
+                String ip = jsonObject.get("query").getAsString(); // Địa chỉ IP
+                String country = jsonObject.get("country").getAsString(); // Quốc gia
+                String region = jsonObject.get("regionName").getAsString(); // Tỉnh/thành phố
+                String city = jsonObject.get("city").getAsString(); // Thành phố
+                String lat = jsonObject.get("lat").getAsString(); // Vĩ độ
+                String lon = jsonObject.get("lon").getAsString(); // Kinh độ
+                // Lấy địa chỉ IP cục bộ
+                InetAddress inetAddress = InetAddress.getLocalHost();
+                String localIp = inetAddress.getHostAddress();
+                IpAddRestDTO ipAddRestDTO = new IpAddRestDTO(ip,localIp,country,region,city,lat,lon);
+                return ipAddRestDTO;
+            } else {
+                System.out.println("Failed to get IP geolocation data.");
+                return null;
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+    
 }
